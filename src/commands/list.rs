@@ -25,24 +25,47 @@ pub fn execute(project: Option<String>, format: OutputFormat) -> TmResult<()> {
 }
 
 fn print_table(tasks: &[(&str, &crate::models::task::Task)]) {
+    // Calculate column widths based on content
+    let mut max_project = "PROJECT".len();
+    let mut max_title = "TITLE".len();
+    let mut max_reference = "REFERENCE".len();
+
+    for (project, task) in tasks {
+        max_project = max_project.max(project.len());
+        max_title = max_title.max(task.title.len());
+        if let Some(ref r) = task.reference {
+            max_reference = max_reference.max(r.len());
+        }
+    }
+
+    // Add some padding
+    max_project += 2;
+    max_title += 2;
+    max_reference += 2;
+
     // Header
     println!(
-        "{:<20} {:<30} {:<50} {:<15}",
+        "{:<project_w$}{:<title_w$}{:<ref_w$}{}",
         "PROJECT".bold(),
         "TITLE".bold(),
+        "REFERENCE".bold(),
         "WORKTREE PATH".bold(),
-        "REFERENCE".bold()
+        project_w = max_project,
+        title_w = max_title,
+        ref_w = max_reference,
     );
-    println!("{}", "-".repeat(120));
 
     // Tasks
     for (project, task) in tasks {
         println!(
-            "{:<20} {:<30} {:<50} {:<15}",
+            "{:<project_w$}{:<title_w$}{:<ref_w$}{}",
             project,
             task.title,
+            task.reference.as_deref().unwrap_or("-"),
             task.worktree_path.display(),
-            task.reference.as_deref().unwrap_or("-")
+            project_w = max_project,
+            title_w = max_title,
+            ref_w = max_reference,
         );
     }
 }
