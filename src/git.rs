@@ -60,9 +60,19 @@ pub fn create_worktree(
             reason: format!("Failed to create branch: {}", e),
         })?;
 
+    // Get the worktree name (last component of path, used for .git/worktrees/<name>)
+    // This must not contain slashes, so we use the directory name
+    let worktree_name = worktree_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| TmError::WorktreeCreationFailed {
+            path: worktree_path.to_path_buf(),
+            reason: "Invalid worktree path".to_string(),
+        })?;
+
     // Create the worktree
     repo.worktree(
-        branch_name,
+        worktree_name,
         worktree_path,
         Some(git2::WorktreeAddOptions::new().reference(Some(branch.get()))),
     )
@@ -131,6 +141,7 @@ pub fn remove_worktree(path: &Path, force: bool) -> TmResult<()> {
 }
 
 /// Get information about a worktree
+#[allow(dead_code)]
 pub fn get_worktree_info(path: &Path) -> TmResult<WorktreeInfo> {
     let repo = Repository::open(path)?;
 
@@ -147,8 +158,116 @@ pub fn get_worktree_info(path: &Path) -> TmResult<WorktreeInfo> {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct WorktreeInfo {
     pub path: PathBuf,
     pub branch: Option<String>,
     pub has_uncommitted_changes: bool,
+}
+
+/// Convert a name to snake_case (for filesystem paths)
+/// Examples: "Auth System" -> "auth_system", "API-Gateway" -> "api_gateway"
+pub fn to_snake_case(s: &str) -> String {
+    s.to_lowercase()
+        .replace([' ', '-'], "_")
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+/// Convert a name to kebab-case (for git branch names)
+/// Examples: "Auth System" -> "auth-system", "API_Gateway" -> "api-gateway"
+pub fn to_kebab_case(s: &str) -> String {
+    s.to_lowercase()
+        .replace([' ', '_'], "-")
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// Extract repository root from main branch path
+/// Example: "/home/user/projects/myapp/main" -> "/home/user/projects/myapp"
+pub fn get_repo_root(main_repo_path: &Path) -> TmResult<PathBuf> {
+    let parent = main_repo_path
+        .parent()
+        .ok_or_else(|| TmError::InvalidMainRepoPath {
+            path: main_repo_path.to_path_buf(),
+        })?;
+
+    if !parent.exists() {
+        return Err(TmError::InvalidMainRepoPath {
+            path: main_repo_path.to_path_buf(),
+        });
+    }
+
+    Ok(parent.to_path_buf())
+}
+
+/// Compute worktree path from components
+/// Format: <repo_root>/<level>/<id>-<name_snake_case>
+pub fn compute_worktree_path(
+    main_repo_path: &Path,
+    level: &str,
+    id: &str,
+    name: &str,
+) -> TmResult<PathBuf> {
+    let repo_root = get_repo_root(main_repo_path)?;
+    let name_snake = to_snake_case(name);
+
+    Ok(repo_root.join(level).join(format!("{}-{}", id, name_snake)))
+}
+
+/// Generate branch name from components
+/// Format: <level>/<id>-<name_kebab_case>
+pub fn generate_branch_name(level: &str, id: &str, name: &str) -> String {
+    let name_kebab = to_kebab_case(name);
+    format!("{}/{}-{}", level, id, name_kebab)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_snake_case() {
+        assert_eq!(to_snake_case("Auth System"), "auth_system");
+        assert_eq!(to_snake_case("API-Gateway"), "api_gateway");
+        assert_eq!(to_snake_case("simple"), "simple");
+        assert_eq!(to_snake_case("Multi  Space"), "multi_space");
+        assert_eq!(to_snake_case("Mixed-Case_Input"), "mixed_case_input");
+        assert_eq!(to_snake_case("UPPERCASE"), "uppercase");
+    }
+
+    #[test]
+    fn test_to_kebab_case() {
+        assert_eq!(to_kebab_case("Auth System"), "auth-system");
+        assert_eq!(to_kebab_case("API_Gateway"), "api-gateway");
+        assert_eq!(to_kebab_case("simple"), "simple");
+        assert_eq!(to_kebab_case("Multi  Space"), "multi-space");
+        assert_eq!(to_kebab_case("Mixed-Case_Input"), "mixed-case-input");
+        assert_eq!(to_kebab_case("UPPERCASE"), "uppercase");
+        assert_eq!(to_kebab_case("nem plonn"), "nem-plonn");
+    }
+
+    #[test]
+    fn test_generate_branch_name() {
+        assert_eq!(
+            generate_branch_name("feature", "JIRA-123", "auth"),
+            "feature/JIRA-123-auth"
+        );
+        assert_eq!(
+            generate_branch_name("fix", "BUG-456", "database"),
+            "fix/BUG-456-database"
+        );
+        assert_eq!(
+            generate_branch_name("chore", "TASK-1", "cleanup"),
+            "chore/TASK-1-cleanup"
+        );
+        assert_eq!(
+            generate_branch_name("feature", "83772", "nem plonn"),
+            "feature/83772-nem-plonn"
+        );
+    }
 }

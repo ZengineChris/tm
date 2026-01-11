@@ -14,6 +14,36 @@ pub struct Cli {
     pub command: Commands,
 }
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum Level {
+    Feature,
+    Fix,
+    Chore,
+    Docs,
+    Refactor,
+    Test,
+    Perf,
+    Style,
+    Ci,
+}
+
+impl Level {
+    /// Convert to lowercase string for branch names and paths
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Level::Feature => "feature",
+            Level::Fix => "fix",
+            Level::Chore => "chore",
+            Level::Docs => "docs",
+            Level::Refactor => "refactor",
+            Level::Test => "test",
+            Level::Perf => "perf",
+            Level::Style => "style",
+            Level::Ci => "ci",
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     /// Add a new task
@@ -21,20 +51,24 @@ pub enum Commands {
         /// Project name
         project: String,
 
-        /// Task title (unique within project)
-        title: String,
+        /// Path to main repository (e.g., ~/projects/myapp/main)
+        main_repo_path: PathBuf,
 
-        /// Worktree path
-        #[arg(short = 'p', long)]
-        worktree_path: PathBuf,
+        /// Task level (feature, fix, chore, etc.)
+        #[arg(short, long, value_enum)]
+        level: Level,
+
+        /// Task ID/reference (e.g., JIRA-123)
+        #[arg(short, long)]
+        id: String,
+
+        /// Task name (will be converted to snake_case)
+        #[arg(short, long)]
+        name: String,
 
         /// Task description
         #[arg(short, long)]
         description: Option<String>,
-
-        /// Reference ID (e.g., JIRA-123)
-        #[arg(short, long)]
-        reference: Option<String>,
 
         /// Remote URL for future integration
         #[arg(long)]
@@ -43,18 +77,6 @@ pub enum Commands {
         /// API URL for future integration
         #[arg(long)]
         api_url: Option<String>,
-
-        /// Create the git worktree if it doesn't exist
-        #[arg(short = 'c', long)]
-        create_worktree: bool,
-
-        /// Base branch for worktree creation (requires --create-worktree)
-        #[arg(short = 'b', long, requires = "create_worktree")]
-        base_branch: Option<String>,
-
-        /// Main repository path for worktree creation (requires --create-worktree)
-        #[arg(short = 'm', long, requires = "create_worktree")]
-        main_repo: Option<PathBuf>,
     },
 
     /// List tasks

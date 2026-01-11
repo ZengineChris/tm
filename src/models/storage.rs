@@ -44,7 +44,7 @@ impl TaskStorage {
 
     /// Add a task to a project
     pub fn add_task(&mut self, project: String, task: Task) -> TmResult<()> {
-        let tasks = self.projects.entry(project.clone()).or_insert_with(Vec::new);
+        let tasks = self.projects.entry(project.clone()).or_default();
 
         // Check for duplicate title
         if tasks.iter().any(|t| t.title == task.title) {

@@ -14,6 +14,7 @@ pub fn get_tasks_file_path() -> TmResult<PathBuf> {
 }
 
 /// Ensure the config directory exists
+#[allow(dead_code)]
 pub fn ensure_config_dir() -> TmResult<PathBuf> {
     let config_dir = dirs::config_dir()
         .ok_or_else(|| {

@@ -32,6 +32,15 @@ pub enum TmError {
     #[error("Git repository not found at {path}")]
     GitRepoNotFound { path: PathBuf },
 
+    #[error("Invalid main repository path: {path}")]
+    InvalidMainRepoPath { path: PathBuf },
+
+    #[error("Worktree already exists at {path}")]
+    WorktreeAlreadyExists { path: PathBuf },
+
+    #[error("Invalid input for {field}: {reason}")]
+    InvalidInput { field: String, reason: String },
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -70,6 +79,23 @@ impl TmError {
                     Either commit or stash your changes, or use --force to remove anyway.",
                     path.display()
                 )
+            }
+            TmError::InvalidMainRepoPath { path } => {
+                format!(
+                    "The main repository path '{}' is invalid.\n\
+                    Please provide a path to your main branch directory (e.g., ~/projects/myapp/main).",
+                    path.display()
+                )
+            }
+            TmError::WorktreeAlreadyExists { path } => {
+                format!(
+                    "A worktree already exists at '{}'.\n\
+                    Please remove it first or use a different name/id.",
+                    path.display()
+                )
+            }
+            TmError::InvalidInput { field, reason } => {
+                format!("Invalid {}: {}", field, reason)
             }
             _ => self.to_string(),
         }
